@@ -13,17 +13,12 @@
  */
 package io.openmessaging.benchmark.driver.kafka;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
-import java.util.concurrent.CompletableFuture;
-
-import org.apache.commons.lang.ArrayUtils;
+import io.openmessaging.benchmark.driver.BenchmarkProducer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
-import io.openmessaging.benchmark.driver.BenchmarkProducer;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 public class KafkaBenchmarkProducer implements BenchmarkProducer {
 

@@ -49,6 +49,8 @@ import io.openmessaging.benchmark.driver.BenchmarkConsumer;
 import io.openmessaging.benchmark.driver.BenchmarkDriver;
 import io.openmessaging.benchmark.driver.BenchmarkProducer;
 import io.openmessaging.benchmark.driver.ConsumerCallback;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class KafkaBenchmarkDriver implements BenchmarkDriver {
 
@@ -107,11 +109,15 @@ public class KafkaBenchmarkDriver implements BenchmarkDriver {
         return "test-topic";
     }
 
+    private static final Logger log = LoggerFactory.getLogger(KafkaBenchmarkDriver.class);
+
     @SuppressWarnings({ "rawtypes", "unchecked" })
     @Override
     public CompletableFuture<Void> createTopic(String topic, int partitions) {
         return CompletableFuture.runAsync(() -> {
             try {
+                log.info("Creating a topic: {}, with {} partitions and replication of: {}",
+                        topic, partitions, config.replicationFactor);
                 NewTopic newTopic = new NewTopic(topic, partitions, config.replicationFactor);
                 newTopic.configs(new HashMap<>((Map) topicProperties));
                 admin.createTopics(Arrays.asList(newTopic)).all().get();
@@ -143,17 +149,23 @@ public class KafkaBenchmarkDriver implements BenchmarkDriver {
         Properties properties = new Properties();
         consumerProperties.forEach((key, value) -> properties.put(key, value));
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, subscriptionName);
-        KafkaConsumer<String, byte[]> consumer = new KafkaConsumer<>(properties);
+        KafkaConsumer<String, byte[]> kafkaConsumer = new KafkaConsumer<>(properties);
         try {
-            consumer.subscribe(Arrays.asList(topic));
-            return CompletableFuture.completedFuture(new KafkaBenchmarkConsumer(consumer,consumerProperties,consumerCallback));
+            // Subscribe
+            kafkaConsumer.subscribe(Arrays.asList(topic));
+
+            // Start polling
+            BenchmarkConsumer benchmarkConsumer = new KafkaBenchmarkConsumer(kafkaConsumer, consumerProperties, consumerCallback);
+
+            // Add to consumer list to close later
+            consumers.add(benchmarkConsumer);
+            return CompletableFuture.completedFuture(benchmarkConsumer);
         } catch (Throwable t) {
-            consumer.close();
+            kafkaConsumer.close();
             CompletableFuture<BenchmarkConsumer> future = new CompletableFuture<>();
             future.completeExceptionally(t);
             return future;
         }
-
     }
 
     @Override

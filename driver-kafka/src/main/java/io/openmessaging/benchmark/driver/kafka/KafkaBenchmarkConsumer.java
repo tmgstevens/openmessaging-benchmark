@@ -20,6 +20,7 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -64,10 +65,9 @@ public class KafkaBenchmarkConsumer implements BenchmarkConsumer {
 
                     Map<TopicPartition, OffsetAndMetadata> offsetMap = new HashMap<>();
                     for (ConsumerRecord<String, byte[]> record : records) {
-                        callback.messageReceived(record.value(), record.timestamp());
-
+                        callback.messageReceived(record.value(), TimeUnit.MILLISECONDS.toNanos(record.timestamp()));
                         offsetMap.put(new TopicPartition(record.topic(), record.partition()),
-                            new OffsetAndMetadata(record.offset()+1));
+                                new OffsetAndMetadata(record.offset()));
                     }
 
                     if (!autoCommit&&!offsetMap.isEmpty()) {
