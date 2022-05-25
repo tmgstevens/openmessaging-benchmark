@@ -100,7 +100,7 @@ public class Benchmark {
 
         if (arguments.workersFile != null) {
             log.info("Reading workers list from {}", arguments.workersFile);
-            arguments.workers = getValues(arguments.workersFile, Workers.class).workers;
+            arguments.workers = getValues(arguments.workersFile, Workers.class, mapper).workers;
         }
 
         // Dump configuration variables
@@ -111,7 +111,7 @@ public class Benchmark {
             File file = new File(path);
             String name = file.getName().substring(0, file.getName().lastIndexOf('.'));
 
-            workloads.put(name, getValues(file, Workload.class));
+            workloads.put(name, getValues(file, Workload.class, mapper));
         }
 
         log.info("Workloads: {}", writer.writeValueAsString(workloads));
@@ -137,7 +137,8 @@ public class Benchmark {
             arguments.drivers.forEach(driverConfig -> {
                 try {
                     File driverConfigFile = new File(driverConfig);
-                    DriverConfiguration driverConfiguration = getValues(driverConfigFile, DriverConfiguration.class);
+                    DriverConfiguration driverConfiguration = getValues(driverConfigFile, DriverConfiguration.class,
+                            mapper);
                     log.info("--------------- WORKLOAD : {} --- DRIVER : {}---------------", workload.name,
                             driverConfiguration.name);
 
@@ -176,7 +177,7 @@ public class Benchmark {
         worker.close();
     }
 
-    private static <T> T getValues(File configFile, Class<T> configClass) throws IOException {
+    public static <T> T getValues(File configFile, Class<T> configClass, ObjectMapper mapper) throws IOException {
         StringSubstitutor stringSubstitutor = StringSubstitutor.createInterpolator();
         String contents = stringSubstitutor.replace(new String(Files.readAllBytes(configFile.toPath())));
 

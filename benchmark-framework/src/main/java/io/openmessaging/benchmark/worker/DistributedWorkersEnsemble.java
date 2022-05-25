@@ -18,6 +18,7 @@ import static java.util.stream.Collectors.toList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
@@ -31,6 +32,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import org.HdrHistogram.Histogram;
+import org.apache.commons.text.StringSubstitutor;
 import org.apache.pulsar.common.util.FutureUtil;
 import org.asynchttpclient.AsyncHttpClient;
 import org.slf4j.Logger;
@@ -83,8 +85,9 @@ public class DistributedWorkersEnsemble implements Worker {
 
     @Override
     public void initializeDriver(File configurationFile) throws IOException {
-        byte[] confFileContent = Files.readAllBytes(Paths.get(configurationFile.toString()));
-        sendPost(workers, "/initialize-driver", confFileContent);
+        StringSubstitutor stringSubstitutor = StringSubstitutor.createInterpolator();
+        String contents = stringSubstitutor.replace(new String(Files.readAllBytes(Paths.get(configurationFile.toString()))));
+        sendPost(workers, "/initialize-driver", contents.getBytes(StandardCharsets.UTF_8));
     }
 
     @Override

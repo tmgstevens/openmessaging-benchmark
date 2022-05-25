@@ -37,6 +37,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.base.Preconditions;
+import io.openmessaging.benchmark.Benchmark;
 import io.openmessaging.benchmark.utils.RateLimiter;
 
 import io.openmessaging.benchmark.utils.UniformRateLimiter;
@@ -134,7 +135,8 @@ public class LocalWorker implements Worker, ConsumerCallback {
         Preconditions.checkArgument(benchmarkDriver == null);
         testCompleted = false;
 
-        DriverConfiguration driverConfiguration = mapper.readValue(driverConfigFile, DriverConfiguration.class);
+        DriverConfiguration driverConfiguration = Benchmark.getValues(driverConfigFile, DriverConfiguration.class,
+                mapper);
 
         log.info("Driver: {}", writer.writeValueAsString(driverConfiguration));
 
