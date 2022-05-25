@@ -177,8 +177,8 @@ public class Benchmark {
     }
 
     private static <T> T getValues(File configFile, Class<T> configClass) throws IOException {
-        StringSubstitutor stringSubstitutor = new StringSubstitutor(StringLookupFactory.INSTANCE.environmentVariableStringLookup());
-        String contents = stringSubstitutor.replace(Files.readAllBytes(configFile.toPath()));
+        StringSubstitutor stringSubstitutor = StringSubstitutor.createInterpolator();
+        String contents = stringSubstitutor.replace(new String(Files.readAllBytes(configFile.toPath())));
 
         return mapper.readValue(contents, configClass);
     }
