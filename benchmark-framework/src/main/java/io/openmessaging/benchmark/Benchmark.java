@@ -20,6 +20,7 @@ package io.openmessaging.benchmark;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -29,6 +30,9 @@ import java.util.TreeMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.apache.commons.text.StringSubstitutor;
+import org.apache.commons.text.lookup.StringLookupFactory;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
@@ -101,7 +105,7 @@ public class Benchmark {
 
         if (arguments.workersFile != null) {
             log.info("Reading workers list from {}", arguments.workersFile);
-            arguments.workers = mapper.readValue(arguments.workersFile, Workers.class).workers;
+            arguments.workers = getValues(arguments.workersFile, Workers.class).workers;
         }
 
         // Dump configuration variables
@@ -112,7 +116,7 @@ public class Benchmark {
             File file = new File(path);
             String name = file.getName().substring(0, file.getName().lastIndexOf('.'));
 
-            workloads.put(name, mapper.readValue(file, Workload.class));
+            workloads.put(name, getValues(file, Workload.class));
         }
 
         log.info("Workloads: {}", writer.writeValueAsString(workloads));
@@ -138,8 +142,7 @@ public class Benchmark {
             arguments.drivers.forEach(driverConfig -> {
                 try {
                     File driverConfigFile = new File(driverConfig);
-                    DriverConfiguration driverConfiguration = mapper.readValue(driverConfigFile,
-                            DriverConfiguration.class);
+                    DriverConfiguration driverConfiguration = getValues(driverConfigFile, DriverConfiguration.class);
                     log.info("--------------- WORKLOAD : {} --- DRIVER : {}---------------", workload.name,
                             driverConfiguration.name);
 
@@ -176,6 +179,13 @@ public class Benchmark {
         });
 
         worker.close();
+    }
+
+    private static <T> T getValues(File configFile, Class<T> configClass) throws IOException {
+        StringSubstitutor stringSubstitutor = new StringSubstitutor(StringLookupFactory.INSTANCE.environmentVariableStringLookup());
+        String contents = stringSubstitutor.replace(Files.readAllBytes(configFile.toPath()));
+
+        return mapper.readValue(contents, configClass);
     }
 
     private static final ObjectMapper mapper = new ObjectMapper(new YAMLFactory())
