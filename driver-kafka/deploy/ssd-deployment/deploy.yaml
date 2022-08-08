@@ -19,13 +19,25 @@
   tasks:
     - command: >
         tuned-adm profile latency-performance
+    - name: Get nvme device IDs
+      set_fact:
+        device_info: "{{ hostvars[inventory_hostname].ansible_devices }}"
+        nvme_device_ids: "{{ hostvars[inventory_hostname].ansible_devices.keys() | map('regex_search', 'nvme.*') | select('string') | list }}"
+    - name: Get nvme devices
+      set_fact:
+        nvme_devices: '{{ (nvme_devices | default([])) + ["/dev/" + item] }}'
+      loop: '{{ nvme_device_ids }}'
+      when: device_info[item]["partitions"] | length == 0
+    - name: Get mount points
+      set_fact:
+        mounts: '{{ (mounts | default([])) + [{ "path": "/mnt/" + item, "src": "/dev/" + item}] }}'
+      loop: '{{ nvme_device_ids }}'
+      when: device_info[item]["partitions"] | length == 0
     - name: Format disks
       filesystem:
          fstype: xfs
          dev: '{{ item }}'
-      with_items:
-        - '/dev/nvme1n1'
-        - '/dev/nvme2n1'
+      with_items: '{{ nvme_devices }}'
     - name: Mount disks
       mount:
         path: "{{ item.path }}"
@@ -33,9 +45,7 @@
         fstype: xfs
         opts: defaults,noatime,nodiscard
         state: mounted
-      with_items:
-        - { path: "/mnt/data-1", src: "/dev/nvme1n1" }
-        - { path: "/mnt/data-2", src: "/dev/nvme2n1" }
+      with_items: '{{ mounts }}'
     - name: Increase hard file descriptor limit
       pam_limits:
         domain: '*'
@@ -61,6 +71,7 @@
         reload: yes
     - name: Reboot the machine with all defaults
       reboot:
+  tags: kafka
 
 - name: Set facts
   hosts: all
@@ -102,6 +113,7 @@
       shell: |
         echo 'LANG=en_US.utf-8
               LC_ALL=en_US.utf-8' > /etc/environment
+  tags: kafka
 
 - name: Create CA
   ansible.builtin.import_playbook: tls/create-ca.yml
@@ -182,6 +194,7 @@
         state: restarted
         daemon_reload: yes
         name: "kafka"
+  tags: kafka
 
 - name: Setup ACLs
   hosts: kafka
