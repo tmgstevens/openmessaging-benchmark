@@ -127,7 +127,8 @@
   tags: client
   tasks:
     - set_fact:
-        bootstrapServers: "{{ groups['redpanda'] | map('extract', hostvars, ['private_ip']) | map('regex_replace', '^(.*)$', '\\1:9092') | join(',') }}"
+        bootstrapServers: "{{ groups['redpanda'] | map('extract', hostvars, ['private_ip']) | map('regex_replace', '^(.*)$', '\\1:9092') | join(',') | default(bootstrapServers) }}"
+      when: bootstrapServers is not defined
 
 - name: install redpanda
   hosts: redpanda
@@ -165,6 +166,7 @@
 
   - name: configure redpanda
     notify:
+      - fix config owner
       - restart redpanda-tuner
       - restart redpanda
     vars:
@@ -206,6 +208,14 @@
         " --format yaml
 
   handlers:
+  - name: fix config owner
+    file:
+      path: /etc/redpanda
+      owner: redpanda
+      group: redpanda
+      mode: 0750
+      state: directory
+      recurse: yes
   - name: restart redpanda-tuner
     systemd:
       name: redpanda-tuner
@@ -233,6 +243,15 @@
         daemon_reload: yes
         name: "chronyd"
   tags: chrony
+
+- name: SASL facts
+  tags: sasl
+  hosts: all
+  tasks:
+    - set_fact:
+        sasl_username: "{{ sasl_username | default('admin') }}"
+        sasl_password: "{{ sasl_password | default('admin') }}"
+      when: sasl_enabled| default(False)|bool == True
 
 - name: Setup Benchmark client
   hosts: client
@@ -272,7 +291,7 @@
       lineinfile:
         dest: "{{ item }}"
         regexp: "^name: Redpanda"
-        line: "name: Redpanda{{ '+SASL' if sasl_enabled | default(False) }}{{ '+TLS' if tls_enabled | default(False) }}"
+        line: "name: Redpanda{{ '+SASL' if sasl_enabled | default(False) | bool == True }}{{ '+TLS' if tls_enabled | default(False)|bool == True }}"
       with_items: "{{ drivers_list.stdout_lines }}"
       when: (sasl_enabled| default(False)|bool == True ) or (tls_enabled| default(False)|bool == True )
 
@@ -281,7 +300,7 @@
         dest: "{{ item }}"
         regexp: "^  security.protocol="
         insertafter: "^  bootstrap.servers="
-        line: "  security.protocol={{ 'SASL_' if sasl_enabled | default(False) }}{{ 'SSL' if tls_enabled | default(False) else 'PLAINTEXT' }}"
+        line: "  security.protocol={{ 'SASL_' if sasl_enabled | default(False) | bool == True }}{{ 'SSL' if tls_enabled | default(False) | bool == True else 'PLAINTEXT' }}"
       with_items: "{{ drivers_list.stdout_lines }}"
       when: (sasl_enabled| default(False)|bool == True ) or (tls_enabled| default(False)|bool == True )
 
@@ -290,9 +309,9 @@
         dest: "{{ item }}"
         regexp: "^  sasl.jaas.config="
         insertafter: "^  bootstrap.servers="
-        line: "  sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username='sa_test' password='sa_test';"
+        line: "  sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username='{{ sasl_username }}' password='{{ sasl_password }}';"
       with_items: "{{ drivers_list.stdout_lines }}"
-      when: tls_enabled| default(False)|bool == True
+      when: sasl_enabled| default(False)|bool == True
 
     - name: Configure memory
       lineinfile:
@@ -327,18 +346,6 @@
         daemon_reload: yes
         name: "benchmark-worker"
 
-- name: Hosts addresses
-  hosts: localhost
-  become: false
-  tasks:
-    - debug:
-        msg: Redpanda nodes {{ item }}"
-      with_items: "{{ groups['redpanda'] }}"
-    - debug:
-        msg: "Benchmark clients {{ item }}"
-      with_items: "{{ groups['client'] }}"
-
-
 # Install the monitoring stack
 - name: Install Node Exporter
   hosts: redpanda, client
@@ -363,12 +370,14 @@
         grafana_dir: "{{ grafana_temp_dir.path }}"
       delegate_to: "{{ groups['redpanda'][0] }}"
       delegate_facts: True
+      when: groups.redpanda is defined
     - name: register temp path with prometheus host
       set_fact: 
         grafana_dir: "{{ grafana_temp_dir.path }}"
       delegate_to: "{{ item }}"
       delegate_facts: True 
       with_items: "{{ groups['prometheus'] }}"
+      when: groups.prometheus is defined
   tags:
     - prometheus
     - grafana
@@ -426,19 +435,27 @@
   tags:
     - prometheus
 
+- name: TLS facts
+  hosts: all,localhost
+  tags: tls
+  tasks:
+    - set_fact:
+        use_temporary_ca: "{{ use_temporary_ca | default(True) | bool }}"
+        ca_cert: "{{ ca_cert | default('ca/ca.crt') }}"
+
 - name: Create CA
   ansible.builtin.import_playbook: tls/create-ca.yml
-  when: tls_enabled| default(False)|bool == True
+  when: tls_enabled| default(False)|bool == True and use_temporary_ca == True
   tags: tls
 
 - name: Generate CSRs
   ansible.builtin.import_playbook: tls/generate-csrs.yml
-  when: tls_enabled| default(False)|bool == True
+  when: tls_enabled| default(False)|bool == True and use_temporary_ca == True
   tags: tls
 
 - name: Generate CSRs
   ansible.builtin.import_playbook: tls/issue-certs.yml
-  when: tls_enabled| default(False)|bool == True
+  when: tls_enabled| default(False)|bool == True and use_temporary_ca == True
   tags: tls
 
 - name: Install certs
