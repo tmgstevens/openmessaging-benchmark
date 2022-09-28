@@ -17,7 +17,7 @@
 # under the License.
 #
 
-name: Kafka
+name: Kafka_1a_50MB
 driverClass: io.openmessaging.benchmark.driver.kafka.KafkaBenchmarkDriver
 # Kafka client-specific configuration
 replicationFactor: 3
@@ -28,15 +28,17 @@ topicConfig: |
   flush.messages=1
   flush.ms=0
 commonConfig: |
-  bootstrap.servers=localhost:9092
+  bootstrap.servers=10.0.0.120:9092,10.0.0.73:9092,10.0.0.43:9092
+  sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required username='sa_test' password='admin-secret';
+  security.protocol=SASL_SSL
+  sasl.mechanism=SCRAM-SHA-256
   request.timeout.ms=120000
 producerConfig: |
   acks=all
   linger.ms=1
   batch.size=131072
 consumerConfig: |
-  group.id=benchGroup
   auto.offset.reset=earliest
   enable.auto.commit=false
-  max.partition.fetch.bytes=131072
   auto.commit.interval.ms=0
+  max.partition.fetch.bytes=131072

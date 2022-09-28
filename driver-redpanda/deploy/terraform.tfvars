@@ -5,7 +5,7 @@ ami             = "ami-0928f4202481dfdf6"
 profile         = "default"
 
 instance_types = {
-  "redpanda"      = "i3en.6xlarge"
+  "redpanda"      = "i3en.xlarge"
   "client"        = "m5n.8xlarge"
   "prometheus"    = "c5.2xlarge"
 }
