@@ -20,7 +20,7 @@
 # Kafka driver profile that is configuring to sync all
 # published messages to disk to achieve durability
 name: Redpanda
-driverClass: io.openmessaging.benchmark.driver.redpanda.RedpandaBenchmarkDriver
+driverClass: io.openmessaging.benchmark.driver.kafka.KafkaBenchmarkDriver
 
 # Kafka client-specific configuration
 replicationFactor: 3
