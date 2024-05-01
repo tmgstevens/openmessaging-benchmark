@@ -48,6 +48,8 @@ import io.openmessaging.benchmark.driver.ConsumerCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.management.remote.rmi._RMIConnection_Stub;
+
 public class RedpandaBenchmarkDriver implements BenchmarkDriver {
 
     private Config config;
@@ -93,14 +95,21 @@ public class RedpandaBenchmarkDriver implements BenchmarkDriver {
                 // Delete all existing topics matching the prefix
                 Set<String> topicsToDelete = new HashSet<String>();
                 String topicPrefix = getTopicNamePrefix();
+                log.debug("Deleting topics starting with {}",getTopicNamePrefix());
                 for (String topic : topics) {
                     if (topic.toString().startsWith(topicPrefix)) {
+                        log.debug("Adding topic {} to deletion list", topic.toString());
                         topicsToDelete.add(topic);
+                    } else {
+                        log.trace("Skipping deletion of topic {}", topic.toString());
                     }
                 }
                 if (topicsToDelete.size() > 0) {
+                    log.debug("Deleting {} topics", topicsToDelete.size());
                     DeleteTopicsResult deletes = admin.deleteTopics(topicsToDelete);
                     deletes.all().get();
+                } else {
+                    log.debug("No topics to delete");
                 }
             } catch (ExecutionException e) {
                 if (e.getCause() instanceof UnknownTopicOrPartitionException) {
@@ -112,6 +121,8 @@ public class RedpandaBenchmarkDriver implements BenchmarkDriver {
                 e.printStackTrace();
                 throw new IOException(e);
             }
+        } else {
+            log.debug("Not deleting topics as reset not set.",getTopicNamePrefix());
         }
     }
 
