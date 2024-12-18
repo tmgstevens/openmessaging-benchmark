@@ -14,6 +14,7 @@
 package io.openmessaging.benchmark.driver.redpanda;
 
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -25,10 +26,18 @@ public class RedpandaBenchmarkProducer implements BenchmarkProducer {
 
     private final KafkaProducer<String, byte[]> producer;
     private final String topic;
+    private final boolean useTransactions;
+    private final Integer msgsPerTransaction;
 
-    public RedpandaBenchmarkProducer(KafkaProducer<String, byte[]> producer, String topic) {
+    private boolean isTxInFlight = false;
+    private int currentTxMessageCount = 0;
+
+    public RedpandaBenchmarkProducer(KafkaProducer<String, byte[]> producer, String topic, Properties producerProperties) {
         this.producer = producer;
         this.topic = topic;
+        this.useTransactions = Boolean.parseBoolean(producerProperties.getProperty("enableTransactions", "false"));
+        this.msgsPerTransaction = Integer.valueOf(producerProperties.getProperty("msgsPerTransaction", "1"));
+        producer.initTransactions();
     }
 
     @Override
@@ -38,6 +47,11 @@ public class RedpandaBenchmarkProducer implements BenchmarkProducer {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         try {
+            if (useTransactions && !isTxInFlight) {
+                producer.beginTransaction();
+                isTxInFlight = true;
+                currentTxMessageCount++;
+            }
             producer.send(record, (metadata, exception) -> {
                 if (exception != null) {
                     future.completeExceptionally(exception);
@@ -45,8 +59,23 @@ public class RedpandaBenchmarkProducer implements BenchmarkProducer {
                     future.complete(null);
                 }
             });
+            if (useTransactions && currentTxMessageCount >= msgsPerTransaction) {
+                producer.commitTransaction();
+                isTxInFlight = false;
+                future.complete(null);
+            }
         } catch(Exception e) {
-            future.completeExceptionally(e);
+            try {
+                if (useTransactions) {
+                    producer.abortTransaction();
+                    isTxInFlight = false;
+                }
+            } catch (Exception ex) {
+                // No need to handle this, we're already throwing an exception at this point.
+                // If the abort transaction failed, that's no better or worse than the previous exception
+            } finally {
+                future.completeExceptionally(e);
+            }
         }
 
         return future;
